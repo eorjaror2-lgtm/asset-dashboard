@@ -34,10 +34,10 @@ export default function Dashboard() {
     try {
       const res = await fetch('/api/assets');
       const json = await res.json();
-      if(json.status === 'success') {
+      if (json.status === 'success') {
         setData(json.data);
-        if(json.history) setHistoryData(json.history);
-        if(json.exchangeRate) setExchangeRate(json.exchangeRate);
+        if (json.history) setHistoryData(json.history);
+        if (json.exchangeRate) setExchangeRate(json.exchangeRate);
       }
     } catch (e) {
       console.error(e);
@@ -81,11 +81,11 @@ export default function Dashboard() {
     acc[type] = (acc[type] || 0) + (item.computedTotalValueKRW || 0);
     return acc;
   }, {} as Record<string, number>);
-  
+
   const pieData = Object.entries(pieDataMap)
-    .filter(([name, value]) => value > 0)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
+    .filter(([name, value]: [string, any]) => value > 0)
+    .map(([name, value]: [string, any]) => ({ name, value }))
+    .sort((a: any, b: any) => b.value - a.value);
 
   // 현재 차트/표 영역 전체 자산의 총합
   const filteredTotalAssets = pieData.reduce((acc, item) => acc + item.value, 0);
@@ -93,7 +93,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
-        
+
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
           <div>
@@ -108,19 +108,19 @@ export default function Dashboard() {
           <div className="flex items-center space-x-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
             {/* 소유자 필터 토글 */}
             <div className="flex items-center p-1 bg-slate-100 rounded-lg shrink-0">
-              <button 
+              <button
                 onClick={() => setOwnerFilter('전체')}
                 className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '전체' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <Users className="w-4 h-4 mr-2" /> 전체
               </button>
-              <button 
+              <button
                 onClick={() => setOwnerFilter('나')}
                 className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '나' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <User className="w-4 h-4 mr-2" /> 감성
               </button>
-              <button 
+              <button
                 onClick={() => setOwnerFilter('와이프')}
                 className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '와이프' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
               >
@@ -128,15 +128,15 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <button 
+            <button
               onClick={() => setCurrency(currency === 'KRW' ? 'USD' : 'KRW')}
               className="flex items-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors shrink-0"
             >
               <DollarSign className="w-4 h-4 mr-1" />
               {currency === 'KRW' ? 'USD' : 'KRW'}
             </button>
-            
-            <button 
+
+            <button
               onClick={fetchData}
               disabled={isRefreshing}
               className={`p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-all disabled:opacity-50 shrink-0`}
@@ -170,7 +170,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-3xl font-bold mt-4">{formatCurrency(myAssets)}</p>
                 <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
-                  <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${(myAssets/totalAssets || 0)*100}%`}}></div>
+                  <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${(myAssets / totalAssets || 0) * 100}%` }}></div>
                 </div>
               </div>
 
@@ -180,8 +180,8 @@ export default function Dashboard() {
                   <div className="p-2 bg-rose-50 rounded-lg"><Wallet className="w-5 h-5 text-rose-600" /></div>
                 </div>
                 <p className="text-3xl font-bold mt-4">{formatCurrency(wifeAssets)}</p>
-                 <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
-                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${(wifeAssets/totalAssets || 0)*100}%`}}></div>
+                <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
+                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${(wifeAssets / totalAssets || 0) * 100}%` }}></div>
                 </div>
               </div>
 
@@ -201,11 +201,10 @@ export default function Dashboard() {
                 <button
                   key={tab.id}
                   onClick={() => setCategoryFilter(tab.id)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all shrink-0 ${
-                    categoryFilter === tab.id
+                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all shrink-0 ${categoryFilter === tab.id
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                       : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -223,7 +222,7 @@ export default function Dashboard() {
                     대상: {ownerFilter === '전체' ? '전체' : (ownerFilter === '나' ? '감성' : '진')}
                   </span>
                 </div>
-                
+
                 <div className="h-[320px]">
                   {pieData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -242,11 +241,11 @@ export default function Dashboard() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)} 
-                          contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                        <Tooltip
+                          formatter={(value: number) => formatCurrency(value)}
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
-                        <Legend wrapperStyle={{paddingTop: '20px'}}/>
+                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
@@ -315,23 +314,23 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={historyData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="날짜" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{fill: '#64748b'}}
+                      <XAxis dataKey="날짜" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#64748b' }}
                         tickFormatter={(value) => `${value / 1000000}M`}
                         dx={-10}
                       />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: number) => `₩${value.toLocaleString()}`}
-                        contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                        labelStyle={{fontWeight: 'bold', color: '#334155', marginBottom: '4px'}}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        labelStyle={{ fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="총자산" 
-                        stroke="#2563eb" 
+                      <Line
+                        type="monotone"
+                        dataKey="총자산"
+                        stroke="#2563eb"
                         strokeWidth={3}
                         dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#ffffff' }}
                         activeDot={{ r: 6, fill: '#1d4ed8', stroke: '#ffffff', strokeWidth: 2 }}
