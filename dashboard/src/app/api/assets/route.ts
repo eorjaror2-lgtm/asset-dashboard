@@ -34,7 +34,7 @@ export async function GET() {
 
       const ticker = r['티커/코드'];
       const assetType = r['자산종류']; // 주식, 코인 등 구분용
-      
+
       try {
         if (ticker) {
           // 1. 코인인 경우 (업비트)
@@ -45,7 +45,7 @@ export async function GET() {
               currentPriceNum = upbitJson[0].trade_price;
               isUpdated = true;
             }
-          } 
+          }
           // 2. 국내/해외 주식인 경우 (yfinance)
           else if (assetType && assetType.includes('주식')) {
             // yahoo-finance2는 국내주식 코드(005930)에 뒤에 .KS 또는 .KQ가 붙어야 함
@@ -69,7 +69,7 @@ export async function GET() {
       const inputAmount = parseFloat(r['금액']?.replace(/,/g, '')) || 0;
       const quantity = parseFloat(r['수량']?.replace(/,/g, '')) || 1; // 수량 없으면 1
       const avgPrice = parseFloat(r['평단가']?.replace(/,/g, '')) || 0;
-      
+
       let totalValue;
       let currentPriceToSave;
 
@@ -80,7 +80,7 @@ export async function GET() {
       } else {
         // API 조회가 안되거나 티커가 없는 비상장/현금성 자산: '금액' 자체가 전체 평가금액
         totalValue = inputAmount;
-        currentPriceToSave = quantity > 0 ? (inputAmount / quantity) : inputAmount; 
+        currentPriceToSave = quantity > 0 ? (inputAmount / quantity) : inputAmount;
       }
 
       const hasCostBasis = avgPrice > 0 && quantity > 0;
@@ -113,9 +113,9 @@ export async function GET() {
     const totalAssets = updatedRows.reduce((sum, item) => sum + (item.computedTotalValueKRW || 0), 0);
     const myAssets = updatedRows.filter(item => item['소유자']?.includes('나') || item['소유자']?.includes('감')).reduce((sum, item) => sum + (item.computedTotalValueKRW || 0), 0);
     const wifeAssets = updatedRows.filter(item => item['소유자']?.includes('아내') || item['소유자']?.includes('진')).reduce((sum, item) => sum + (item.computedTotalValueKRW || 0), 0);
-    
+
     let historySheet = doc.sheetsByTitle['HISTORY'];
-    
+
     if (totalAssets > 0) {
       if (!historySheet) {
         historySheet = await doc.addSheet({ title: 'HISTORY', headerValues: ['날짜', '총자산(감성)', '총자산(진)', '합계'] });
@@ -123,7 +123,7 @@ export async function GET() {
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const historyRows = await historySheet.getRows();
       const lastRow = historyRows[historyRows.length - 1];
-      
+
       const newData = { '날짜': today, '총자산(감성)': wifeAssets, '총자산(진)': myAssets, '합계': totalAssets };
 
       if (lastRow && lastRow.get('날짜') === today) {
@@ -134,7 +134,7 @@ export async function GET() {
       }
     }
 
-    let historyData = [];
+    let historyData: any[] = [];
     if (historySheet) {
       try {
         const historyRows = await historySheet.getRows();
