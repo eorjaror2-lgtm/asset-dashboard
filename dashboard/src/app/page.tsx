@@ -202,8 +202,8 @@ export default function Dashboard() {
                   key={tab.id}
                   onClick={() => setCategoryFilter(tab.id)}
                   className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all shrink-0 ${categoryFilter === tab.id
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                     }`}
                 >
                   {tab.label}
@@ -242,7 +242,7 @@ export default function Dashboard() {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value: number) => formatCurrency(value)}
+                          formatter={(value: any) => formatCurrency(value)}
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
                         <Legend wrapperStyle={{ paddingTop: '20px' }} />
