@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, RefreshCw, DollarSign, Loader2, Users, User, Heart } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
@@ -316,12 +316,14 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="날짜" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
                       <YAxis
+                        domain={[0, 2000000000 * 1.1]}
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#64748b' }}
-                        tickFormatter={(value) => `${value / 1000000}M`}
+                        tickFormatter={(value) => `${value / 100000000}억`}
                         dx={-10}
                       />
+                      <ReferenceLine y={2000000000} stroke="#ef4444" strokeDasharray="5 5" label={{ position: 'insideTopLeft', value: '원금목표 20억', fill: '#ef4444', fontSize: 12, fontWeight: 'bold' }} />
                       <Tooltip
                         formatter={(value: any) => `₩${value.toLocaleString()}`}
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
