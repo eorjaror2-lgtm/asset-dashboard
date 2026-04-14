@@ -1,49 +1,44 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, RefreshCw, DollarSign, Loader2, Users, User, Heart } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Loader2 } from 'lucide-react';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
+const TARGET_AMOUNT = 2000000000; // 20억
 
-const CATEGORY_TABS = [
-  { id: '자산종류', label: '자산 종류' },
-  { id: '유동성', label: '유동성' },
-  { id: '통화', label: '통화' },
-  { id: '계좌성격', label: '계좌 성격' },
-  { id: '위험성', label: '위험성' },
-  { id: '섹터', label: '섹터' },
-  { id: '주식종류', label: '주식 종류' },
-  { id: '세부분류', label: '세부 분류' }
-];
+interface AssetItem {
+  '자산종류'?: string;
+  '자산명'?: string;
+  '티커/코드'?: string;
+  '통화'?: string;
+  '소유자'?: string;
+  computedCurrentPrice?: number;
+  computedTotalValue?: number;
+  computedTotalValueKRW?: number;
+  computedProfit?: number;
+  computedProfitKRW?: number;
+  computedPrincipalKRW?: number;
+  computedProfitRate?: number;
+  [key: string]: any;
+}
 
 export default function Dashboard() {
-  const [currency, setCurrency] = useState<'KRW' | 'USD'>('KRW');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<AssetItem[]>([]);
   const [historyData, setHistoryData] = useState<any[]>([]);
-  const [exchangeRate, setExchangeRate] = useState(1350);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 새로운 필터 State
-  const [ownerFilter, setOwnerFilter] = useState<'전체' | '나' | '와이프'>('전체');
-  const [categoryFilter, setCategoryFilter] = useState<string>('자산종류');
-
   const fetchData = async () => {
-    setIsRefreshing(true);
     try {
       const res = await fetch('/api/assets');
       const json = await res.json();
-      if (json.status === 'success') {
+      if(json.status === 'success') {
         setData(json.data);
-        if (json.history) setHistoryData(json.history);
-        if (json.exchangeRate) setExchangeRate(json.exchangeRate);
+        if(json.history) setHistoryData(json.history);
       }
     } catch (e) {
       console.error(e);
       alert("데이터를 불러오는데 실패했습니다.");
     } finally {
-      setIsRefreshing(false);
       setIsLoading(false);
     }
   };
@@ -52,299 +47,282 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  const formatCurrency = (value: number) => {
-    if (currency === 'USD') {
-      return `$${(value / exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-    }
-    return `₩${value.toLocaleString()}`;
-  };
-
-  // 통계 계산 (요약 카드용 글로벌 계산: KRW로 통합된 평가액 사용)
+  // 지표 계산
   const totalAssets = data.reduce((acc, item) => acc + (item.computedTotalValueKRW || 0), 0);
-  const myAssets = data.filter(item => item['소유자']?.includes('나') || item['소유자']?.includes('감')).reduce((acc, item) => acc + (item.computedTotalValueKRW || 0), 0);
-  const wifeAssets = data.filter(item => item['소유자']?.includes('아내') || item['소유자']?.includes('진')).reduce((acc, item) => acc + (item.computedTotalValueKRW || 0), 0);
   const totalProfit = data.reduce((acc, item) => acc + (item.computedProfitKRW || 0), 0);
   const totalPrincipal = data.reduce((acc, item) => acc + (item.computedPrincipalKRW || 0), 0);
   const totalProfitRate = totalPrincipal > 0 ? (totalProfit / totalPrincipal) * 100 : 0;
+  
+  const remainingTarget = TARGET_AMOUNT - totalAssets;
+  const targetAchievedPercent = (totalAssets / TARGET_AMOUNT) * 100;
 
-  // 테이블과 파이차트에 적용할 필터링된 배열 데이터
-  const filteredData = data.filter(item => {
-    if (ownerFilter === '전체') return true;
-    if (ownerFilter === '나') return item['소유자']?.includes('나') || item['소유자']?.includes('감');
-    if (ownerFilter === '와이프') return item['소유자']?.includes('아내') || item['소유자']?.includes('진');
-    return true;
-  });
-
-  // 파이차트용 데이터 (선택된 categoryFilter 기준으로 전부 KRW 기준 합산)
-  const pieDataMap = filteredData.reduce((acc, item) => {
-    const type = item[categoryFilter] || '미분류';
+  // 카테고리 구성 (순자산 구성 바 용도)
+  const categoryTotalMap = data.reduce((acc, item) => {
+    const type = item['자산종류'] || '미분류';
     acc[type] = (acc[type] || 0) + (item.computedTotalValueKRW || 0);
     return acc;
   }, {} as Record<string, number>);
 
-  const pieData = Object.entries(pieDataMap)
-    .filter(([name, value]: [string, any]) => value > 0)
-    .map(([name, value]: [string, any]) => ({ name, value }))
-    .sort((a: any, b: any) => b.value - a.value);
+  const categoryArray = Object.entries(categoryTotalMap)
+    .filter(([_, val]) => val > 0)
+    .map(([name, val]) => ({ name, value: val, percent: (val / totalAssets) * 100 }))
+    .sort((a, b) => b.value - a.value);
 
-  // 현재 차트/표 영역 전체 자산의 총합
-  const filteredTotalAssets = pieData.reduce((acc, item) => acc + item.value, 0);
+  // TOP 5 수익금 (임시로 전월 증감 스펙을 대체)
+  const sortedByProfit = [...data].filter(d => (d.computedPrincipalKRW || 0) > 0);
+  const topIncreases = [...sortedByProfit].sort((a, b) => (b.computedProfitKRW || 0) - (a.computedProfitKRW || 0)).slice(0, 5);
+  const topDecreases = [...sortedByProfit].sort((a, b) => (a.computedProfitKRW || 0) - (b.computedProfitKRW || 0)).slice(0, 5);
+
+  const formatNumber = (val: number) => Math.round(val).toLocaleString();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 className="w-10 h-10 animate-spin text-slate-300" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+    <div className="min-h-screen bg-white text-slate-900 p-4 md:p-10 font-sans">
+      <div className="max-w-[1400px] mx-auto space-y-8">
+        
+        {/* 1. 헤더 */}
+        <div className="flex justify-between items-end border-b border-slate-100 pb-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">감진 통합 자산 대시보드</h1>
-            <div className="flex items-center mt-2 space-x-3 mb-1">
-              <p className="text-slate-500">구글 스프레드시트 실시간 연동</p>
-              <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md border border-blue-100 shadow-sm">
-                적용된 실시간 환율 (1$ = {exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}원)
-              </span>
-            </div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">목표는 동반퇴사 자산 대시보드</h1>
+            <p className="text-sm font-medium text-slate-400">월 1회 입력 - 항목별 증감/증감률 자동</p>
           </div>
-          <div className="flex items-center space-x-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            {/* 소유자 필터 토글 */}
-            <div className="flex items-center p-1 bg-slate-100 rounded-lg shrink-0">
-              <button
-                onClick={() => setOwnerFilter('전체')}
-                className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '전체' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Users className="w-4 h-4 mr-2" /> 전체
-              </button>
-              <button
-                onClick={() => setOwnerFilter('나')}
-                className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '나' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <User className="w-4 h-4 mr-2" /> 감성
-              </button>
-              <button
-                onClick={() => setOwnerFilter('와이프')}
-                className={`flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-all ${ownerFilter === '와이프' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Heart className="w-4 h-4 mr-2" /> 진
-              </button>
+          <p className="text-xs font-semibold text-slate-300">Sheets → Web</p>
+        </div>
+
+        {/* 2. 월 선택 컨트롤 */}
+        <div className="flex justify-between items-center px-2">
+          <span className="text-sm font-bold text-slate-700">현재 기준</span>
+          <select className="border border-slate-200 bg-white text-sm font-semibold text-slate-700 px-4 py-2 rounded shadow-sm outline-none">
+            <option>Latest</option>
+          </select>
+        </div>
+
+        {/* 3. 상단 5구 KPI 박스 (부채 제거 요건 반영) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="border border-slate-100 bg-[#fbfcfc] rounded-xl p-5 flex flex-col justify-between shadow-sm">
+            <span className="text-xs font-bold text-slate-400 mb-4">순자산</span>
+            <div className="flex items-baseline justify-end space-x-1">
+              <span className="text-2xl md:text-3xl font-bold">{formatNumber(totalAssets)}</span>
+              <span className="text-base font-bold">원</span>
             </div>
+            <span className="text-[10px] text-slate-400 mt-2">전체 평가금액 합산</span>
+          </div>
 
-            <button
-              onClick={() => setCurrency(currency === 'KRW' ? 'USD' : 'KRW')}
-              className="flex items-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors shrink-0"
-            >
-              <DollarSign className="w-4 h-4 mr-1" />
-              {currency === 'KRW' ? 'USD' : 'KRW'}
-            </button>
+          <div className="border border-slate-100 bg-[#fbfcfc] rounded-xl p-5 flex flex-col justify-between shadow-sm">
+            <span className="text-xs font-bold text-slate-400 mb-4">투자 원금</span>
+            <div className="flex items-baseline justify-end space-x-1">
+              <span className="text-2xl md:text-3xl font-bold">{formatNumber(totalPrincipal)}</span>
+              <span className="text-base font-bold">원</span>
+            </div>
+            <span className="text-[10px] text-slate-400 mt-2">평단가가 존재하는 자산</span>
+          </div>
 
-            <button
-              onClick={fetchData}
-              disabled={isRefreshing}
-              className={`p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-all disabled:opacity-50 shrink-0`}
-            >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
+          <div className="border border-slate-100 bg-[#fbfcfc] rounded-xl p-5 flex flex-col justify-between shadow-sm">
+             <span className="text-xs font-bold text-slate-400 mb-4">총 수익금</span>
+            <div className="flex items-baseline justify-end space-x-1">
+              <span className="text-2xl md:text-3xl font-bold">{formatNumber(totalProfit)}</span>
+              <span className="text-base font-bold">원</span>
+            </div>
+            <span className="text-[10px] text-slate-400 mt-2">현금, 예적금 외 변동수익</span>
+          </div>
+
+          <div className="border border-slate-100 bg-[#fbfcfc] rounded-xl p-5 flex flex-col justify-between shadow-sm">
+             <span className="text-xs font-bold text-slate-400 mb-4">총 수익률</span>
+            <div className="flex items-baseline justify-end space-x-1">
+              <span className="text-2xl md:text-3xl font-bold">{totalProfitRate.toFixed(2)}</span>
+              <span className="text-base font-bold">%</span>
+            </div>
+            <span className="text-[10px] text-slate-400 mt-2">원금 대비 수익 비율</span>
+          </div>
+          
+          <div className="border border-slate-100 bg-[#fbfcfc] rounded-xl p-5 flex flex-col justify-between shadow-sm">
+             <span className="text-xs font-bold text-slate-400 mb-4">동반퇴사(20억)까지</span>
+            <div className="flex items-baseline justify-end space-x-1">
+              <span className="text-2xl md:text-3xl font-bold">{formatNumber(remainingTarget > 0 ? remainingTarget : 0)}</span>
+              <span className="text-base font-bold">원</span>
+            </div>
+            <span className="text-[10px] text-slate-400 mt-2">목표 달성률 {targetAchievedPercent.toFixed(1)}%</span>
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-            <span className="ml-3 text-lg font-medium text-slate-600">구글 시트 연동 중입니다...</span>
+        {/* 4. 순자산 추이 차트 */}
+        <div className="border border-slate-100 bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center space-x-4 mb-8">
+            <h3 className="text-sm font-extrabold text-slate-800">순자산 추이</h3>
+            <div className="flex text-xs space-x-3 text-slate-500 font-semibold bg-slate-50 px-3 py-1 rounded-full">
+              <span>목표 대비 <span className="text-slate-800">{targetAchievedPercent.toFixed(1)}%</span></span>
+              <span>남은 액 <span className="text-slate-800">{formatNumber(remainingTarget > 0 ? remainingTarget : 0)}원</span></span>
+            </div>
           </div>
-        ) : (
-          <>
-            {/* Top Summary Cards (Fixed) */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-slate-500 font-medium">전체 순자산</h3>
-                  <div className="p-2 bg-blue-50 rounded-lg"><Wallet className="w-5 h-5 text-blue-600" /></div>
-                </div>
-                <p className="text-3xl font-bold mt-4">{formatCurrency(totalAssets)}</p>
-              </div>
+          
+          <div className="h-[250px] w-full">
+            {historyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={historyData} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="날짜" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 600}} dy={10} />
+                  <YAxis 
+                    domain={[0, TARGET_AMOUNT * 1.1]} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 600}}
+                    tickFormatter={(value) => `${(value / 100000000).toFixed(0)}억`}
+                    dx={-10}
+                  />
+                  <ReferenceLine y={TARGET_AMOUNT} stroke="#ef4444" strokeDasharray="5 5" label={{ position: 'insideTopLeft', value: '목표 20억', fill: '#ef4444', fontSize: 11, fontWeight: 'bold' }} />
+                  <Tooltip 
+                    formatter={(value: number) => [`${formatNumber(value)}원`, '순자산']}
+                    contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '13px', fontWeight: 'bold'}}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="총자산" 
+                    stroke="#334155" 
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#334155', strokeWidth: 2, stroke: '#ffffff' }}
+                    activeDot={{ r: 6, fill: '#0f172a', stroke: '#ffffff', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-300 text-sm font-semibold">데이터가 없습니다</div>
+            )}
+          </div>
+        </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-slate-500 font-medium">👨 나의 자산 (감성)</h3>
-                  <div className="p-2 bg-indigo-50 rounded-lg"><Wallet className="w-5 h-5 text-indigo-600" /></div>
-                </div>
-                <p className="text-3xl font-bold mt-4">{formatCurrency(myAssets)}</p>
-                <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
-                  <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${(myAssets / totalAssets || 0) * 100}%` }}></div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-slate-500 font-medium">👩 와이프 자산 (진)</h3>
-                  <div className="p-2 bg-rose-50 rounded-lg"><Wallet className="w-5 h-5 text-rose-600" /></div>
-                </div>
-                <p className="text-3xl font-bold mt-4">{formatCurrency(wifeAssets)}</p>
-                <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
-                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${(wifeAssets / totalAssets || 0) * 100}%` }}></div>
-                </div>
-              </div>
-
-              <div className={`p-6 rounded-2xl shadow-md text-white transition-shadow ${totalProfitRate >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-700 hover:shadow-emerald-500/20' : 'bg-gradient-to-br from-rose-500 to-red-700 hover:shadow-rose-500/20'}`}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-white/80 font-medium">전체 합산 수익률</h3>
-                  <div className="p-2 bg-white/20 rounded-lg"><TrendingUp className="w-5 h-5 text-white" /></div>
-                </div>
-                <p className="text-3xl font-bold mt-4">{totalProfitRate > 0 ? '+' : ''}{totalProfitRate.toFixed(2)}%</p>
-                <p className="text-sm text-white/80 mt-2">수익금: {formatCurrency(totalProfit)}</p>
-              </div>
+        {/* 5. 순자산 구성 CSS Bar */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-end border-b border-slate-100 pb-2">
+            <div>
+              <h3 className="text-sm font-black text-slate-800">순자산 구성</h3>
             </div>
-
-            {/* 분류 탭 Pill 버튼들 */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 overflow-x-auto flex space-x-2 scrollbar-hide shrink-0">
-              {CATEGORY_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCategoryFilter(tab.id)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all shrink-0 ${categoryFilter === tab.id
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                    }`}
+            <p className="text-[10px] font-semibold text-slate-400">카테고리별 자산 비중</p>
+          </div>
+          
+          <div className="w-full h-32 flex rounded-lg overflow-hidden border border-slate-200 shadow-sm">
+            {categoryArray.map((cat, idx) => {
+              // 그레이스케일 계조 (비중 순으로 진한 회색 -> 옅은 회색)
+              const grays = ['bg-slate-400', 'bg-slate-300', 'bg-slate-200', 'bg-slate-100', 'bg-slate-50', 'bg-slate-800'];
+              return (
+                <div 
+                  key={cat.name} 
+                  style={{ width: `${cat.percent}%` }}
+                  className={`${grays[idx % grays.length]} h-full border-r border-white flex flex-col items-center justify-center transition-all hover:opacity-80 p-1`}
                 >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Middle Section: Chart & Table */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-1 flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-800">
-                    {CATEGORY_TABS.find(t => t.id === categoryFilter)?.label || '분류'} 구성비
-                  </h3>
-                  <span className={`text-xs font-semibold px-2 py-1 rounded-md ${ownerFilter === '전체' ? 'bg-slate-100 text-slate-500' : (ownerFilter === '나' ? 'bg-indigo-100 text-indigo-700' : 'bg-rose-100 text-rose-700')}`}>
-                    대상: {ownerFilter === '전체' ? '전체' : (ownerFilter === '나' ? '감성' : '진')}
-                  </span>
-                </div>
-
-                <div className="h-[320px]">
-                  {pieData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          innerRadius={80}
-                          outerRadius={120}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: any) => formatCurrency(value)}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-slate-400">데이터가 없습니다</div>
+                  {cat.percent >= 5 && (
+                    <>
+                      <span className="text-xs font-bold text-slate-800 text-center">{cat.name}</span>
+                      <span className="text-[10px] font-bold text-slate-600">{cat.percent.toFixed(0)}%</span>
+                    </>
                   )}
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2 overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-800">종목별 상세 현황</h3>
-                  <span className="text-sm text-slate-500 font-medium">총 {filteredData.length}건 ({formatCurrency(filteredTotalAssets)})</span>
-                </div>
-                <div className="overflow-x-auto overflow-y-auto flex-1 max-h-[400px]">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-white">
-                      <tr className="border-b border-slate-200 text-sm text-slate-500">
-                        <th className="pb-3 pt-2 font-medium">자산명 (티커)</th>
-                        <th className="pb-3 pt-2 font-medium">
-                          {CATEGORY_TABS.find(t => t.id === categoryFilter)?.label || '분류'}
-                        </th>
-                        <th className="pb-3 pt-2 font-medium text-right">현재가</th>
-                        <th className="pb-3 pt-2 font-medium text-right">평가금액</th>
-                        <th className="pb-3 pt-2 font-medium text-right">수익률</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                      {filteredData.map((item, idx) => (
-                        <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                          <td className="py-3 font-semibold text-slate-900">
-                            {item['자산명']}
-                            {item['티커/코드'] ? <span className="text-xs text-slate-400 font-normal ml-2">({item['티커/코드']})</span> : null}
-                          </td>
-                          <td className="py-3 text-slate-600">
-                            <span className="px-2 py-1 bg-slate-100 rounded-md text-xs font-medium">
-                              {item[categoryFilter] || '미분류'}
-                            </span>
-                          </td>
-                          <td className="py-3 text-right font-medium">
-                            {item['통화']?.toUpperCase().includes('USD') ? '$' : '₩'}
-                            {item.computedCurrentPrice ? item.computedCurrentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
-                          </td>
-                          <td className="py-3 text-right font-medium text-slate-900">
-                            {formatCurrency(item.computedTotalValueKRW || 0)}
-                          </td>
-                          <td className="py-3 text-right font-semibold">
-                            {item.computedProfitRate !== 0 ? (
-                              <span className={item.computedProfitRate > 0 ? 'text-rose-500' : 'text-blue-500'}>
-                                {item.computedProfitRate > 0 ? '+' : ''}{item.computedProfitRate.toFixed(2)}%
-                              </span>
-                            ) : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+        {/* 6. 증가 / 감소 TOP 5 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t border-slate-100 pt-8">
+          
+          {/* 증가 TOP 5 */}
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-black text-slate-800">수익 증가 TOP 5</h3>
+              <span className="text-[10px] font-semibold text-slate-400">수익금 기준</span>
             </div>
-
-            {/* Bottom Section: History Chart */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">자산 증감 추이</h3>
-              <div className="h-[300px] w-full">
-                {historyData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="날짜" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#64748b' }}
-                        tickFormatter={(value) => `${value / 1000000}M`}
-                        dx={-10}
-                      />
-                      <Tooltip
-                        formatter={(value: any) => `₩${value.toLocaleString()}`}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        labelStyle={{ fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="총자산"
-                        stroke="#2563eb"
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#ffffff' }}
-                        activeDot={{ r: 6, fill: '#1d4ed8', stroke: '#ffffff', strokeWidth: 2 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-slate-400">데이터가 없습니다</div>
-                )}
-              </div>
+            <div className="space-y-4">
+              {topIncreases.map((item, idx) => {
+                const profit = item.computedProfitKRW || 0;
+                if (profit <= 0) return null;
+                // max bar width calculation
+                const maxProfit = topIncreases[0]?.computedProfitKRW || 1;
+                const widthPercent = (profit / maxProfit) * 100;
+                
+                return (
+                  <div key={idx} className="flex items-center text-xs font-bold text-slate-700">
+                    <div className="w-32 truncate pr-4">{item['자산명']}</div>
+                    <div className="flex-1 bg-slate-50 h-3 rounded-full overflow-hidden relative mr-4">
+                      <div className="absolute top-0 left-0 bg-red-600 h-full rounded-full" style={{ width: `${widthPercent}%`}}></div>
+                    </div>
+                    <div className="w-24 text-right text-red-600">+{formatNumber(profit)}원</div>
+                  </div>
+                )
+              })}
             </div>
+          </div>
 
-          </>
-        )}
+          {/* 감소 TOP 5 */}
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-black text-slate-800">수익 감소 TOP 5</h3>
+              <span className="text-[10px] font-semibold text-slate-400">수익금 기준</span>
+            </div>
+            <div className="space-y-4">
+              {topDecreases.map((item, idx) => {
+                const profit = item.computedProfitKRW || 0;
+                if (profit >= 0) return null;
+                
+                const minProfit = topDecreases[0]?.computedProfitKRW || -1;
+                const widthPercent = (profit / minProfit) * 100;
+
+                return (
+                  <div key={idx} className="flex items-center text-xs font-bold text-slate-700">
+                    <div className="w-32 truncate pr-4">{item['자산명']}</div>
+                    <div className="flex-1 bg-slate-50 h-3 rounded-full overflow-hidden relative mr-4">
+                      <div className="absolute top-0 left-0 bg-blue-600 h-full rounded-full" style={{ width: `${widthPercent}%`}}></div>
+                    </div>
+                    <div className="w-24 text-right text-blue-600">{formatNumber(profit)}원</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 7. 상세 표 */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden mt-12 bg-white">
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+            <h3 className="text-sm font-black text-slate-800">항목별 상세</h3>
+            <span className="text-[10px] font-semibold text-slate-400">전체 포트폴리오</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-[#f8fafc] border-b border-slate-200">
+                <tr>
+                  <th className="p-4 font-bold">항목명</th>
+                  <th className="p-4 font-bold">분류</th>
+                  <th className="p-4 font-bold text-right">투자원금(원)</th>
+                  <th className="p-4 font-bold text-right">현재 평가액(원)</th>
+                  <th className="p-4 font-bold text-right">수익금(원)</th>
+                  <th className="p-4 font-bold text-right">수익률(%)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 font-bold">{item['자산명']} <span className="text-[10px] text-slate-400 font-normal ml-1">{item['티커/코드']}</span></td>
+                    <td className="p-4 font-semibold text-slate-500">{item['자산종류']}</td>
+                    <td className="p-4 font-semibold text-slate-600 text-right">{formatNumber(item.computedPrincipalKRW || 0)}</td>
+                    <td className="p-4 font-bold text-slate-800 text-right">{formatNumber(item.computedTotalValueKRW || 0)}</td>
+                    <td className={`p-4 font-bold text-right ${(item.computedProfitKRW || 0) > 0 ? 'text-red-500' : (item.computedProfitKRW || 0) < 0 ? 'text-blue-500' : 'text-slate-500'}`}>
+                      {(item.computedProfitKRW || 0) > 0 ? '+' : ''}{formatNumber(item.computedProfitKRW || 0)}
+                    </td>
+                    <td className={`p-4 font-bold text-right ${(item.computedProfitRate || 0) > 0 ? 'text-red-500' : (item.computedProfitRate || 0) < 0 ? 'text-blue-500' : 'text-slate-500'}`}>
+                      {(item.computedProfitRate || 0) > 0 ? '+' : ''}{(item.computedProfitRate || 0).toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
       </div>
     </div>
