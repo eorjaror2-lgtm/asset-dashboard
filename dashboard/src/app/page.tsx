@@ -178,7 +178,7 @@ export default function Dashboard() {
                   />
                   <ReferenceLine y={TARGET_AMOUNT} stroke="#ef4444" strokeDasharray="5 5" label={{ position: 'insideTopLeft', value: '목표 20억', fill: '#ef4444', fontSize: 11, fontWeight: 'bold' }} />
                   <Tooltip 
-                    formatter={(value: number) => [`${formatNumber(value)}원`, '순자산']}
+                    formatter={(value: any) => [`${formatNumber(value)}원`, '순자산']}
                     contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '13px', fontWeight: 'bold'}}
                   />
                   <Line 
